@@ -1,0 +1,7 @@
+POSIX Thread
+
+병렬적으로 작동하는 소프트웨어 작성을 위해 제공되는 표준 API
+
+PThread는 Unix 계열의 POSIX 시스템(리눅스, 솔라리스 등)에서 일반적으로 사용되는 라이브러리 
+
+참고 : https://ko.wikipedia.org/wiki/POSIX_%EC%8A%A4%EB%A0%88%EB%93%9C
