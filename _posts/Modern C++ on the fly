@@ -797,3 +797,458 @@ std::ostream& operator<<(typename std::enable_if<std::is_enum<T>::value, std::os
 
 Chapter 03: Language Runtime Enhancements
 
+3.1 Lambda Expression
+
+Lambda expressions provide a feature like anonymous functions.
+
+Anonymous functions are used when a function is needed, but you don’t want to use a name to call a function.
+
+- Basics
+
+[capture list] (parameter list) mutable(optional) exception attribute -> return type 
+{
+    // function body
+}
+
+  The capture list can serve to transfer external data and can be divided into several types
+
+    1. Value capture
+
+    Similar to parameter passing, the value capture is based on the fact that the variable can be copied, 
+    except that the captured variable is copied when the lambda expression is created, not when it is called
+
+void lambda_value_capture() 
+{
+    int value = 1;
+    auto copy_value = [value] 
+    {
+        return value;
+    };
+
+    value = 100;
+
+    auto stored_value = copy_value();
+
+    // At this moment, stored_value == 1, and value == 100.
+    // Because copy_value has copied when its was created.
+    std::cout << "stored_value = " << stored_value << std::endl;
+}
+
+    2. Reference capture
+
+    Similar to a reference pass, the reference capture saves the reference and the value changes.
+
+void lambda_reference_capture() 
+{
+    int value = 1;
+    auto copy_value = [&value] 
+    {
+        return value;
+    };
+    value = 100;
+
+    auto stored_value = copy_value();
+
+    // At this moment, stored_value == 100, value == 100.
+    // Because copy_value stores reference
+    std::cout << "stored_value = " << stored_value << std::endl;
+}
+
+    3. Implicit capture
+
+    • [] empty capture list
+    • [name1, name2, …] captures a series of variables
+    • [&] reference capture, let the compiler deduce the reference list by itself
+    • [=] value capture, let the compiler deduce the value list by itself
+
+    4. Expression capture
+
+    C++14 gives us the convenience of allowing the captured members to be initialized with arbitrary expressions, 
+    which allows the capture of rvalues
+
+#include <iostream>
+#include <memory> // std::make_unique
+#include <utility> // std::move
+
+void lambda_expression_capture() 
+{
+    auto important = std::make_unique<int>(1);
+    auto add = [v1 = 1, v2 = std::move(important)](int x, int y) -> int 
+    {
+        return x + y + v1 + (*v2);
+    };
+    
+    std::cout << add(3,4) << std::endl;
+}
+
+    5. Generic Lambda
+
+    In C++14, the formal parameters of the lambda function can use the auto keyword to utilize template generics.
+
+void lambda_generic() 
+{
+    auto generic = [](auto x, auto y) 
+    {
+        return x+y;
+    };
+
+    std::cout << generic(1, 2) << std::endl;
+    std::cout << generic(1.1, 2.2) << std::endl;
+}
+    
+3.2 Function Object Wrapper
+
+- std::function
+
+  The essence of a Lambda expression is an object of a class type (called a closure type) that is similar to a function object type (called a closure object). 
+  
+  When the capture list of a Lambda expression is empty, the closure object can also be converted to a function pointer value for delivery.
+
+#include <iostream>
+
+using foo = void(int); // function pointer, Lambda as a function type
+
+void functional(foo f) 
+{
+    f(1);
+}
+
+int main() 
+{
+    auto f = [](int value) 
+    {
+        std::cout << value << std::endl;
+    };
+
+    functional(f); // call by function pointer
+    f(1);          // call by lambda expression
+
+    return 0;
+}
+
+  In C++11, these concepts are unified. 
+  The type of object that can be called is collectively called the callable type. 
+  This type is introduced by "std::function".
+
+  std::function is a generic, polymorphic function wrapper whose instances can store, copy, and call any target entity that can be called. 
+  It is also an existing callable to C++.
+  A type-safe package of entities (relatively, the call to a function pointer is not type-safe), in other words, a container of functions.
+
+#include <functional>
+#include <iostream>
+
+int foo(int param) 
+{
+    return param;
+}
+
+int main() 
+{
+    // std::function wraps a function that take int paremeter and returns int value
+    std::function<int(int)> func = foo;
+
+    int important = 10;
+
+    std::function<int(int)> func2 = [&](int value) -> int 
+    {
+        return 1 + value + important;
+    };
+
+    std::cout << func(10) << std::endl;
+    std::cout << func2(10) << std::endl;
+}
+
+- std::bind and std::placeholder
+
+  std::bind is used to bind the parameters of the function call.
+
+int foo(int a, int b, int c) 
+{
+    return a + b + c;
+}
+
+int main() 
+{
+    // bind parameter 1, 2 on function foo,
+    // and use std::placeholders::_1 as placeholder for the first parameter.
+    auto bindFoo = std::bind(foo, std::placeholders::_1, 1,2);
+
+    // when call bindFoo, we only need one param left
+    bindFoo(1);
+}
+
+3.3 rvalue Reference
+
+- lvalue, rvalue, prvalue, xvalue
+
+    1. lvalue ( left value )
+    The value to the left of the assignment symbol. To be precise, an lvalue is a persistent object that still exists after and expression.
+
+    2. Rvalue ( right value )
+    The value on the right refers to the temporary object that no longer exists after the expression ends.
+
+    The concpet of rvalue is further divided into two : prvalue and xvalue
+
+      i) prvalue ( pure rvalue )
+        (1) Purely literal such as 10 or true
+        (2) The result of the evaluation that is equivalent to a literal or anonymous temporary object like 1 + 2
+        (3) Temporary variables returned by non-references
+        (4) Temporary variables generated by operation expressions, original literals, and lambda expressions
+
+      Note that a literal (except a string literal) is a prvalue. However, a string literal is an lvalue with type const char array.
+
+#include <type_traits>
+
+int main() 
+{
+    // Correct. The type of "01234" is const char [6], so it is an lvalue
+    const char (&left)[6] = "01234";
+
+    // Assert success. It is a const char [6] indeed. Note that decltype(expr)
+    // yields lvalue reference if expr is an lvalue and neither an unparenthesized
+    // id-expression nor an unparenthesized class member access expression.
+    static_assert(std::is_same<decltype("01234"), const char(&)[6]>::value, "");
+    
+    // Error. "01234" is an lvalue, which cannot be referenced by an rvalue reference
+    // const char (&&right)[6] = "01234";
+}
+
+const char* p = "01234";    // Correct. "01234" is implicitly converted to const char*
+const char*&& pr = "01234"; // Correct. "01234" is implicitly converted to const char*, which is a
+const char*& pl = "01234";  // Error. There is no type const char* lvalue
+
+      i) xvalue ( expiring value )
+      a value that is destroyed but can be moved.
+
+std::vector<int> foo() 
+{
+    std::vector<int> temp = {1, 2, 3, 4};
+    return temp;
+}
+
+int main()
+{
+    std::vector<int> v = foo(); // Entire temp is copied to v and destroied ( a large overhead )
+    // ...
+}
+
+      The return value generated by foo() is used as a temporary value. 
+
+      Once copied by v, it will be destroyed immediately, and cannot be obtained or modified.
+    
+      The xvalue defines behavior in which temporary values can be identified while being able to be moved.
+
+      After C++11, the compiler did some work for us, where the lvalue temp is subjected to this implicit rvalue conversion, 
+      equivalent to static_cast<std::vector<int> &&>(temp), where v here moves the value returned by foo locally.
+
+- rvalue reference and lvalue reference
+
+  To get a xvalue, you need to use the declaration of the rvalue reference: T &&, where T is the type.
+
+  The statement of the rvalue reference extends the lifecycle of this temporary value, 
+  and as long as the variable is alive,
+  the xvalue will continue to survive.
+
+  C++11 provides the std::move method to unconditionally convert lvalue parameters to rvalues.
+
+#include <iostream>
+#include <string>
+
+void reference(std::string& str) 
+{
+    std::cout << "lvalue" << std::endl;
+}
+
+void reference(std::string&& str) 
+{
+    std::cout << "rvalue" << std::endl;
+}
+
+int main()
+{
+    std::string lv1 = "string,"; // lv1 is a lvalue
+    // std::string&& r1 = lv1; // illegal, rvalue can't ref to lvalue
+    std::string&& rv1 = std::move(lv1); // legal, std::move can convert lvalue to rvalue
+    
+    std::cout << rv1 << std::endl; // string,
+
+    const std::string& lv2 = lv1 + lv1; // legal, const lvalue reference can extend temp variable's lifecycle
+
+    // lv2 += "Test"; // illegal, const ref can't be modified
+    std::cout << lv2 << std::endl; // string,string,
+    std::string&& rv2 = lv1 + lv2; // legal, rvalue ref extend lifecycle
+
+    rv2 += "string"; // legal, non-const reference can be modified
+
+    std::cout << rv2 << std::endl; // string,string,string,string
+    reference(rv2); // output: lvalue
+
+    return 0;
+}
+
+  rv2 refers to an rvalue, but since it is a reference, rv2 is still an lvalue.
+
+#include <iostream>
+int main() 
+{
+    // int &a = std::move(1); // illegal, non-const lvalue reference cannot ref rvalue
+    const int &b = std::move(1); // legal, const lvalue reference can
+    std::cout << b << std::endl;
+}
+
+  The first question, why not allow non-constant references to bind to non-lvalues? 
+
+  This is because there is a logic error in this approach:
+
+void increase(int & v) 
+{
+    v++;
+}
+
+void foo() 
+{
+    double s = 1;
+    increase(s);
+}
+
+  Since int& can’t reference a parameter of type double, you must generate a temporary value to hold the value of s.
+  Thus, when increase() modifies this temporary value, s itself is not modified after the call is completed.
+
+  The second question, why do constant references allow binding to non-lvalues? The reason is simple because Fortran needs it.
+
+- Move semantics
+
+  Traditional C++ does not distinguish between the concepts of “mobile” and “copy”, resulting in a large amount of data copying, wasting time and space.
+
+  The appearance of rvalue references solves the confusion of these two concepts
+
+#include <iostream>
+
+class A 
+{
+    public:
+        int *pointer;
+
+        A() : pointer(new int(1)) 
+        {
+            std::cout << "construct" << pointer << std::endl;
+        }
+
+        A(A& a) : pointer(new int(*a.pointer)) 
+        {
+            std::cout << "copy" << pointer << std::endl;
+        }
+
+        // meaningless object copy
+        A(A&& a) : pointer(a.pointer) 
+        {
+            a.pointer = nullptr;
+            std::cout << "move" << pointer << std::endl;
+        }
+        
+        ~A()
+        {
+            std::cout << "destruct" << pointer << std::endl;
+            delete pointer;
+        }
+};
+
+// avoid compiler optimization
+A return_rvalue(bool test) 
+{
+    A a,b;
+    
+    if(test) 
+    {
+        return a; // equal to static_cast<A&&>(a);
+    }
+    else
+    {
+        return b; // equal to static_cast<A&&>(b);
+    }
+}
+
+int main() 
+{
+    A obj = return_rvalue(false);
+
+    std::cout << "obj:" << std::endl;
+    std::cout << obj.pointer << std::endl;
+    std::cout << *obj.pointer << std::endl;
+
+    return 0;
+}
+
+    1. First construct two A objects inside return_rvalue, and get the output of the two constructors
+
+    2. After the function returns, it will generate a xvalue, which is referenced by the moving structure of A (A(A&&)), 
+    thus extending the life cycle, and taking the pointer in the rvalue and saving it to obj. 
+    In the middle, the pointer to the xvalue is set to nullptr, which prevents the memory area from being destroyed
+
+  This avoids meaningless copy constructs and enhances performance. 
+
+#include <iostream> // std::cout
+#include <utility> // std::move
+#include <vector> // std::vector
+#include <string> // std::string
+
+int main() 
+{
+    std::string str = "Hello world.";
+    std::vector<std::string> v;
+
+    // use push_back(const T&), copy
+    v.push_back(str);
+
+    // "str: Hello world."
+    std::cout << "str: " << str << std::endl;
+
+    // use push_back(const T&&),
+    // no copy the string will be moved to vector,
+    // and therefore std::move can reduce copy cost
+    v.push_back(std::move(str));
+
+    // str is empty now
+    std::cout << "str: " << str << std::endl;
+    return 0;
+}
+
+- Perfect forwarding
+
+  The rvalue reference of a declaration is actually an lvalue. 
+  This creates problems for us to parameterize (pass)
+
+#include <iostream>
+#include <utility>
+
+void reference(int& v) 
+{
+    std::cout << "lvalue reference" << std::endl;
+}
+
+void reference(int&& v) 
+{
+    std::cout << "rvalue reference" << std::endl;
+}
+
+template <typename T>
+void pass(T&& v) 
+{
+    std::cout << " normal param passing: ";
+
+    // Since v is a reference variable, it always be an lvalue.
+    reference(v);
+}
+
+int main() 
+{
+    std::cout << "rvalue pass:" << std::endl;
+    pass(1);
+
+    std::cout << "lvalue pass:" << std::endl;
+    int l = 1;
+    pass(l);
+
+    return 0;
+}
+
