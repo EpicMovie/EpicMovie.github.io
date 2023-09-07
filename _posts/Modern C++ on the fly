@@ -477,3 +477,323 @@ and only deal with those core dynamic services at runtime, to greatly optimize t
 template class std::vector<bool>; // force instantiation
 extern template class std::vector<double>; // should not instantiation in current file
 
+- The">"
+
+template<bool T>
+class MagicType 
+{
+    bool magic = T;
+};
+
+int main()
+{
+    // legal, but not recommended
+    std::vector<MagicType<(1>2)>> magic; 
+
+    // ... 
+}
+
+- Type alias templates
+
+  Templates are used to generate types.
+
+  In traditional C++, typedef can define a new name for the type, but there is no way to define a new name for the template
+
+  C++11 uses "using" to introduce the following form of writing, and at the same time supports the same effect as the traditional "typedef:"
+
+typedef int (*process)(void *);
+using NewProcess = int(*)(void *);
+
+template<typename T>
+using TrueDarkMagic = MagicType<std::vector<T>, std::string>;
+
+int main() 
+{
+    TrueDarkMagic<bool> you;
+}
+
+- Variadic templates
+
+  C++11 added a new representation, allowing any number, template parameters of any category, 
+  and there is no need to fix the number of parameters when defining.
+
+template<typename... Ts> class Magic;
+
+class Magic<int, std::vector<int>, std::map<std::string, std::vector<int>>> darkMagic;
+
+  a number of 0 is also possible
+
+class Magic<>
+
+  If you do not want to generate 0 template parameters, you can manually define at least one template parameter
+
+template<typename Require, typename... Args> class Magic;
+
+  The function parameters also use the same representation to represent the indefinite length parameters, 
+  which provides a convenient means for us to simply write variable length parameter functions
+
+  Also we can use sizeof... to calculate the number of arguments:
+
+#include <iostream>
+
+template<typename... Ts>
+void magic(Ts... args) 
+{
+    std::cout << sizeof...(args) << std::endl;
+}
+
+  We can unpack the parameters with several methods
+
+  1. Recursive template function
+
+#include <iostream>
+
+template<typename T0>
+void printf1(T0 value) 
+{
+    std::cout << value << std::endl;
+}
+
+template<typename T, typename... Ts>
+void printf1(T value, Ts... args) 
+{
+    std::cout << value << std::endl;
+    printf1(args...);
+}
+
+int main() 
+{
+    printf1(1, 2, "123", 1.1);
+    return 0;
+}
+
+  2. Variable parameter template expansion
+
+template<typename T0, typename... T>
+void printf2(T0 t0, T... t) 
+{
+    std::cout << t0 << std::endl;
+    
+    if constexpr (sizeof...(t) > 0)
+    {
+        printf2(t...);
+    }
+}
+
+  3. Initialize list expansion
+
+template<typename T, typename... Ts>
+auto printf3(T value, Ts... args) 
+{
+    std::cout << value << std::endl;
+
+    (void) std::initializer_list<T>{([&args] { std::cout << args << std::endl; }(), value)...};
+}
+
+- Fold expression
+
+  In C++ 17, this feature of the variable length parameter is further brought to the expression
+
+#include <iostream>
+
+template<typename ... T>
+auto sum(T ... t) 
+{
+    return (t + ...);
+}
+
+int main() 
+{
+    std::cout << sum(1, 2, 3, 4, 5, 6, 7, 8, 9, 10) << std::endl;
+}
+
+- Non-type template parameter deduction
+
+template <typename T, int BufSize>
+
+class buffer_t 
+{
+    public:
+        T& alloc();
+        void free(T& item);
+    
+    private:
+        T data[BufSize];
+}
+
+buffer_t<int, 100> buf; // 100 as template parameter
+
+  Passing with a specific literal, can the compiler assist us in type derivation.
+  In C++17, there is no longer a need to explicitly specify the type by using the placeholder "auto".
+
+template <auto value> void foo() 
+{
+    std::cout << value << std::endl;
+    return;
+}
+
+int main() 
+{
+    foo<10>(); // value as int
+}
+
+2.6 Object-oriented
+
+- Delegate constructor
+
+C++11 introduces the concept of a delegate construct, which allows a constructor to call another constructor in a constructor in the same class
+
+#include <iostream>
+
+class Base 
+{
+    public:
+        int value1;
+        int value2;
+    
+        Base() 
+        {
+            value1 = 1;
+        }
+
+        Base(int value) : Base() 
+        { 
+            // delegate Base() constructor
+            value2 = value;
+        }
+};
+
+int main() 
+{
+    Base b(2);
+    std::cout << b.value1 << std::endl;
+    std::cout << b.value2 << std::endl;
+}
+
+- Inheritance constructor
+
+   C++11 introduces the concept of inheritance constructors "using" the keyword using:
+
+#include <iostream>
+
+class Base 
+{
+    public:
+        int value1;
+        int value2;
+
+        Base() 
+        {
+            value1 = 1;
+        }
+
+        Base(int value) : Base()
+        { 
+            // delegate Base() constructor
+            value2 = value;
+        }
+};
+
+class Subclass : public Base 
+{
+    public:
+        using Base::Base; // inheritance constructor
+};
+
+int main() 
+{
+    Subclass s(3);
+    std::cout << s.value1 << std::endl;
+    std::cout << s.value2 << std::endl;
+}
+
+- Explicit virtual function overwrite
+
+  In traditional C++, it is often prone to accidentally overloading virtual functions.
+
+  C++11 introduces the two keywords "override" and "final" to prevent this from happening
+
+    1. override
+
+    When overriding a virtual function, introducing the override keyword will explicitly tell the compiler to overload, 
+    and the compiler will check if the base function has such a virtual function with consistent function signature, otherwise it will not compile:
+
+struct Base 
+{
+    virtual void foo(int);
+};
+
+struct SubClass: Base 
+{
+    virtual void foo(int) override; // legal
+    virtual void foo(float) override; // illegal, no virtual function in super class
+};
+
+    2. final
+    "final" is to prevent the class from being continued to inherit and to terminate the virtual function to continue to be overloaded.
+
+struct Base 
+{
+    virtual void foo() final;
+};
+
+struct SubClass1 final: Base {}; // legal
+struct SubClass2 : SubClass1 {}; // illegal, SubClass1 has final
+struct SubClass3: Base 
+{
+    void foo(); // illegal, foo has final
+};
+
+- Explicit delete default function
+
+  The ability to accurately control the generation of default functions cannot be controlled.
+  Also, the default constructor generated by the compiler cannot exist at the same time as the user-defined constructor. 
+
+  C++11 allow explicit declarations to take or reject functions that come with the compiler
+
+class Magic 
+{
+    public:
+        Magic() = default; // explicit let compiler use default constructor
+        Magic& operator=(const Magic&) = delete; // explicit declare refuse constructor
+        Magic(int magic_number);
+}
+
+- Strongly typed enumerations
+  
+  In traditional C++, enumerated types are not type-safe, and enumerated types are treated as integers.
+
+  C++11 introduces an enumeration class and declares it using the syntax of "enum class":
+
+enum class new_enum : unsigned int 
+{
+    value1,
+    value2,
+    value3 = 100,
+    value4 = 100
+};
+
+    1. It cannot be implicitly converted to an integer
+    2. It cannot be compared to integer numbers
+    3. It is even less likely to compare enumerated values of different enumerated types
+
+  you can compare
+
+if (new_enum::value3 == new_enum::value4) 
+{ 
+    std::cout << "new_enum::value3 == new_enum::value4" << std::endl;
+}
+
+We want to get the value of the enumeration value, we will have to explicitly type conversion,
+but we can overload the << operator to output, you can collect the following code snippet:
+
+#include <iostream>
+
+template<typename T>
+std::ostream& operator<<(typename std::enable_if<std::is_enum<T>::value, std::ostream>::type& stream, const T& e)
+{
+        return stream << static_cast<typename std::underlying_type<T>::type>(e);
+}
+
+Chapter 03: Language Runtime Enhancements
+
