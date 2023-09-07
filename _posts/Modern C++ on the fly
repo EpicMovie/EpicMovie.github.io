@@ -1,1 +1,233 @@
+Chapter 01: Towards Modern C++
+
+1.1 Deprecated Features ( If you don't know, don't even try to understand about that )
+
+• The string literal constant is no longer allowed to be assigned to a char *. If you need to assign and initialize a char * with a string literal constant, you should use const char * or auto.
+
+char *str = "hello world" -> string = "hello world" or const char *str = "hello world"
+
+• C++98 exception description, unexpected_handler, set_unexpected() and other related features are deprecated and should use noexcept.
+
+• auto_ptr is deprecated and unique_ptr should be used.
+
+• register keyword is deprecated and can be used but no longer has any practical meaning.
+
+• The ++ operation of the bool type is deprecated.
+
+• If a class has a destructor, the properties for which it generates copy constructors and copy assignment operators are deprecated
+
+• C language style type conversion is deprecated 
+
+1.2 Compatibilities with C
+
+You should have the idea that "C++ is not a superset of C" in your mind
+
+When you have to use C, you should pay attention to the use of extern "C", separate the C language code from the C++ code
+
+// foo.h
+#ifdef __cplusplus
+    extern "C" {
+#endif
+
+int add(int x, int y);
+
+#ifdef __cplusplus
+}
+#endif
+
+// foo.c
+int add(int x, int y) 
+{
+    return x+y;
+}
+
+// 1.1.cpp
+#include "foo.h"
+#include <iostream>
+#include <functional>
+int main() 
+{
+    [out = std::ref(std::cout << "Result from C code: " << add(1, 2))]()
+    {
+        out.get() << ".\n";
+    }();
+
+    return 0;
+}
+
+Chapter 02: Language Usability Enhancements
+
+2.1 Constants
+- nullptr
+
+  The purpose of nullptr appears to replace NULL
+
+  C++ without the void * implicit conversion has to define NULL as 0. 
+
+  Defining NULL to 0 will cause the overloading feature in C++ to be confusing.
+
+// Source 
+#include <iostream>
+#include <type_traits>
+
+void foo(char *);
+void foo(int);
+
+int main() 
+{
+    if (std::is_same<decltype(NULL), decltype(0)>::value)
+    {
+        std::cout << "NULL == 0" << std::endl;
+    }
+
+    if (std::is_same<decltype(NULL), decltype((void*)0)>::value)
+    {
+        std::cout << "NULL == (void *)0" << std::endl;
+    }
+
+    if (std::is_same<decltype(NULL), std::nullptr_t>::value)
+    {
+        std::cout << "NULL == nullptr" << std::endl;
+    }
+
+    foo(0); // will call foo(int)
+    // foo(NULL); // doesn't compile
+    foo(nullptr); // will call foo(char*)
+
+    return 0;
+}
+
+void foo(char *) 
+{
+    std::cout << "foo(char*) is called" << std::endl;
+}
+
+void foo(int i) 
+{
+    std::cout << "foo(int) is called" << std::endl;
+}
+
+  The outputs are:
+
+  foo(int) is called
+  foo(char*) is called
+
+- constexpr
+
+  C++ itself already has the concept of constant expressions, such as 1+2, 3*4. 
+  
+  Such expressions always produce the same result without any side effects. 
+
+  If the compiler can directly optimize and embed these expressions into the program at compile-time, it will increase the performance of the program.
+
+  In addition, the function of constexpr can use recursion
+
+#include <iostream>
+
+#define LEN 10
+
+int len_foo() 
+{
+    int i = 2;
+    return i;
+}
+
+constexpr int len_foo_constexpr() 
+{
+    return 5;
+}
+
+constexpr int fibonacci(const int n) 
+{
+    return n == 1 || n == 2 ? 1 : fibonacci(n-1) + fibonacci(n-2);
+}
+
+int main() 
+{
+    char arr_1[10]; // legal
+    char arr_2[LEN]; // legal
+
+    int len = 10;
+    
+    // char arr_3[len]; // illegal
+    const int len_2 = len + 1;
+    constexpr int len_2_constexpr = 1 + 2 + 3;
+
+    // char arr_4[len_2]; // illegal, but ok for most of the compilers
+    char arr_4[len_2_constexpr]; // legal
+
+    // char arr_5[len_foo()+5]; // illegal
+    char arr_6[len_foo_constexpr() + 1]; // legal
+    
+    // 1, 1, 2, 3, 5, 8, 13, 21, 34, 55
+    std::cout << fibonacci(10) << std::endl;
+
+    return 0;
+}
+
+2.2 Variables and initialization
+
+- if-switch
+
+#include <iostream>
+#include <vector>
+#include <algorithm>
+
+int main() 
+{
+    std::vector<int> vec = {1, 2, 3, 4};
+    
+    // since c++17, can be simplified by using `auto`
+    const std::vector<int>::iterator itr = std::find(vec.begin(), vec.end(), 2);
+
+    if (itr != vec.end()) 
+    {
+        *itr = 3;
+    }
+
+    if (const std::vector<int>::iterator itr = std::find(vec.begin(), vec.end(), 3); itr != vec.end()) 
+    {
+        *itr = 4;
+    }
+
+    // should output: 1, 4, 3, 4. can be simplified using `auto`
+    for (std::vector<int>::iterator element = vec.begin(); element != vec.end(); ++element)
+
+    std::cout << *element << std::endl;
+}
+
+- Initializer list
+  Binds the concept of the initialization list to the type and calls it std::initializer_list, 
+  allowing the constructor or other function to use the initialization list like a parameter
+
+#include <initializer_list>
+#include <vector>
+#include <iostream>
+
+class MagicFoo 
+{
+    public:
+        std::vector<int> vec;
+
+        MagicFoo(std::initializer_list<int> list) 
+        {
+            for (std::initializer_list<int>::iterator it = list.begin(); it != list.end(); ++it)
+            {
+                vec.push_back(*it);
+            }
+        }
+};
+
+int main() 
+{
+    // after C++11
+    MagicFoo magicFoo = {1, 2, 3, 4, 5};
+
+    std::cout << "magicFoo: ";
+
+    for (std::vector<int>::iterator it = magicFoo.vec.begin(); it != magicFoo.vec.end(); ++it)
+    {
+        std::cout << *it << std::endl;
+    }
+}
 
