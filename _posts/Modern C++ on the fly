@@ -1264,5 +1264,51 @@ int main()
             T&&           |       lvalue ref        |                   T&
             T&&           |       rvalue ref        |                   T&&
 
+  Therefore, the use of T&& in a template function may not be able to make an rvalue reference, 
+  and when a lvalue is passed, a reference of this function will be derived as an lvalue.
 
+  No matter what type of reference the template parameter is, 
+  the template parameter can be derived as a right reference type if and only if the argument type is a right reference.
+
+  Perfect forwarding let us pass the parameters, keep the original parameter type
+
+#include <iostream>
+#include <utility>
+
+void reference(int& v)
+{
+    std::cout << "lvalue reference" << std::endl;
+}
+
+void reference(int&& v)
+{
+    std::cout << "rvalue reference" << std::endl;
+}
+
+template<typename T>
+void pass(T&& v)
+{
+    std::cout << "Normal Passing : ";
+    reference(v);
+
+    std::cout << "Move Passing : ";
+    reference(std::move(v));
+
+    std::cout << "Forward Passing : ";
+    reference(std::forward<T>(v));
+
+    std::cout << "static_cast<T&&> param passing: ";
+    reference(static_cast<T&&>(v));
+}
+
+int main() {
+    std::cout << "rvalue pass:" << std::endl;
+    pass(1);
+
+    std::cout << "lvalue pass:" << std::endl;
+    int l = 1;
+    pass(l);
+
+    return 0;
+}
 
