@@ -610,7 +610,6 @@ int main()
 - Non-type template parameter deduction
 
 template <typename T, int BufSize>
-
 class buffer_t 
 {
     public:
@@ -626,7 +625,8 @@ buffer_t<int, 100> buf; // 100 as template parameter
   Passing with a specific literal, can the compiler assist us in type derivation.
   In C++17, there is no longer a need to explicitly specify the type by using the placeholder "auto".
 
-template <auto value> void foo() 
+template <auto value> 
+void foo() 
 {
     std::cout << value << std::endl;
     return;
@@ -1243,12 +1243,26 @@ void pass(T&& v)
 int main() 
 {
     std::cout << "rvalue pass:" << std::endl;
-    pass(1);
+    pass(1);    // Even though value ifself is rvalue, v is reference value. So "void reference(int& v)" will be called
 
     std::cout << "lvalue pass:" << std::endl;
     int l = 1;
-    pass(l);
+    pass(l);    // Successfully passed to "void reference(int& v)"
+
+    reference(1);  // Successfully passed to "void reference(int&& v)"
 
     return 0;
 }
+
+  In traditional C++, it is impossible to continue reference a reference type.
+
+  Now it is possible to reference references. But follow the rule below
+
+  Function parameter type | Argument parameter type | Post-derivation function parameter type
+            T&            |       lvalue ref        |                   T&
+            T&            |       rvalue ref        |                   T&
+            T&&           |       lvalue ref        |                   T&
+            T&&           |       rvalue ref        |                   T&&
+
+
 
