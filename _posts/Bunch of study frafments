@@ -5,3 +5,16 @@ POSIX Thread
 PThread는 Unix 계열의 POSIX 시스템(리눅스, 솔라리스 등)에서 일반적으로 사용되는 라이브러리 
 
 참고 : https://ko.wikipedia.org/wiki/POSIX_%EC%8A%A4%EB%A0%88%EB%93%9C
+
+Endian ( Byte Order )
+
+1차원의 공간에 여러 개의 연속된 대상을 배열하는 방법
+
+0x12345678
+
+1. Big Endian → 12, 34, 56, 78 ( 편한 디버깅 )
+
+2. Little Endian -> 78, 56, 34, 12 ( 하위 바이트들에 대한 별도의 계산 필요 없이 바로 접근 가능 )
+
+3. Middle Endian -> 양 쪽으로 모두 사용 가능
+
