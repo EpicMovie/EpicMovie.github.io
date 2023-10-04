@@ -18,7 +18,7 @@ Endian ( Byte Order )
 
 3. Middle Endian -> 양 쪽으로 모두 사용 가능
 
-RAII
+RAII ( Resource acquisition is initialization )
 
 RAII는 C++에서 자주 쓰이는 idiom으로 자원의 안전한 사용을 위해 객체가 쓰이는 스코프를 벗어나면 자원을 해제해주는 기법이다. 
 
@@ -64,7 +64,6 @@ void unmaintanableFunction()
 }
 
 이 코드의 경우 어떤 상황에서든 resource를 해제하고는 있다. 하지만 좋은 코드는 아니다. 
-
 
 void safeFunction() 
 {
