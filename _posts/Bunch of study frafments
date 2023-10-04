@@ -18,3 +18,71 @@ Endian ( Byte Order )
 
 3. Middle Endian -> 양 쪽으로 모두 사용 가능
 
+RAII
+
+RAII는 C++에서 자주 쓰이는 idiom으로 자원의 안전한 사용을 위해 객체가 쓰이는 스코프를 벗어나면 자원을 해제해주는 기법이다. 
+
+C++에서 heap에 할당된 자원은 명시적으로 해제하지 않으면 해제되지 않지만, stack에 할당된 자원은 자신의 scope가 끝나면 메모리가 해제되며 destructor가 불린다는 원리를 이용한 것이다.
+
+원래는 exception 등으로 control flow가 예상치 못하게 변경될 때를 대비하기 위해서 쓰이던 기법이다.
+
+void unsafeFunction() 
+{
+    Resource* resource = new Resource();
+
+    /* Do something with resource */
+      thisFunctionCanThrowException();
+
+    /* Do something else with resource */
+
+    delete resource;
+}
+
+thisFunctionCanThrowException() 함수에서 exception을 발생시킨다면 resource를 해제하지 못하게 되므로 코드가 위험하다.
+
+void unmaintanableFunction() 
+{
+    Resource* resource = nullptr;
+  
+    try 
+    {
+        resource = new Resource();
+
+        /* Do something with resource */
+
+        thisFunctionCanThrowException();
+
+        /* Do something else with resource */
+
+        delete resource;
+    }
+    catch(std::exception& e) 
+    {
+        delete resource;
+        throw e;
+    }
+}
+
+이 코드의 경우 어떤 상황에서든 resource를 해제하고는 있다. 하지만 좋은 코드는 아니다. 
+
+
+void safeFunction() 
+{
+    std::unique_ptr<Resource> resource(new Resource());
+
+    /* Do something with resource */
+    thisFunctionCanThrowException();
+    /* Do something else with resource */
+}
+
+세 번째 코드는 RAII를 위해 c++ 11의 스마트 포인터인 unique_ptr을 이용하는 방법이다. unique_ptr은 소멸할 때 자신이 들고 있는 메모리를 해제시켜주기 때문에 함수 밖으로 나가면 resource가 해제되는 것이 보장된다.
+
+여기서 말하는 자원은 단순히 heap 메모리만을 말하는 것이 아니다. heap 메모리 이외에도 파일이나 database connection과 같은 것들도 전부 RAII를 이용해 안전하게 사용할 수 있다.
+
+여기에 더 나아가서 특정 scope를 벗어나면 반드시 실행돼야 하는 코드들도 RAII를 이용해 처리할 수 있다. 
+
+즉, 다른 언어에서 finally에 해당하는 구문을 RAII를 이용해서 처리할 수 있다. 
+
+실제로 C++의 아버지이자 RAII라는 용어를 처음 만든 Bjarne Stroustrub는 c++에 finally를 집어넣지 않는 이유를 "RAII가 있는데 굳이 있을 필요가 없다."라고 말하고 있다.
+
+참고 : https://blog.seulgi.kim/2014/01/raii.html
