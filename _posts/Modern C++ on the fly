@@ -23,7 +23,7 @@ char *str = "hello world" -> string = "hello world" or const char *str = "hello 
 You should have the idea that "C++ is not a superset of C" in your mind
 
 When you have to use C, you should pay attention to the use of extern "C", separate the C language code from the C++ code
-
+```
 // foo.h
 #ifdef __cplusplus
     extern "C" {
@@ -34,13 +34,16 @@ int add(int x, int y);
 #ifdef __cplusplus
 }
 #endif
+```
 
+```
 // foo.c
 int add(int x, int y) 
 {
     return x+y;
 }
-
+```
+```
 // 1.1.cpp
 #include "foo.h"
 #include <iostream>
@@ -54,7 +57,7 @@ int main()
 
     return 0;
 }
-
+```
 Chapter 02: Language Usability Enhancements
 
 2.1 Constants
